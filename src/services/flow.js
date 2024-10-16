@@ -16,19 +16,14 @@ const SCREEN_RESPONSES = {
         };
       }),
       is_date_enabled: true,
-      time: Array.from({ length: 13 }, async (_, i) => {
+      time: Array.from({ length: 13 }, (_, i) => {
         const hour = 8 + i;
         const amPmHour = hour <= 12 ? hour : hour - 12;
         const period = hour < 12 ? 'AM' : 'PM';
-        const timeId = `${hour}:00`;
-        const date = SCREEN_RESPONSES.APPOINTMENT.data.date[0].id; // Assuming date is selected from the first date
-        const availableMentor = await findAvailableMentor(date);
-        const enabled = availableMentor !== null;
-
         return {
-          id: timeId,
+          id: `${hour}:00`,
           title: `${amPmHour}:00 ${period}`,
-          enabled,
+          enabled: true,
         };
       }),
       is_time_enabled: false,
@@ -71,7 +66,7 @@ const SCREEN_RESPONSES = {
   },
 };
 
-export const getNextScreen = async (decryptedBody) => {
+export const getNextScreen = async (decryptedBody, companyId) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
   // handle health check request
   if (action === "ping") {
@@ -125,7 +120,7 @@ export const getNextScreen = async (decryptedBody) => {
             time: await Promise.all(SCREEN_RESPONSES.APPOINTMENT.data.time.map(async (timeSlot, index) => {
               let enabled = true;
               if (data.date) {
-                const availableMentor = await findAvailableMentor(data.date);
+                const availableMentor = await findAvailableMentor(companyId, data.date);
                 if (availableMentor === null) {
                   enabled = false; // Disable time slot if no available mentor
                 }
