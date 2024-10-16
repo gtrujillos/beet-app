@@ -100,7 +100,7 @@ export async function findAvailableMentor(companyId, dateTime) {
       return false;
     });
      
-    console.log('eventsOnDateTime:', eventsOnDateTime);
+    // console.log('eventsOnDateTime:', eventsOnDateTime);
 
     // Get all mentors
     const mentors = await mentorAgendaRepository.getAllMentors();
@@ -113,7 +113,7 @@ export async function findAvailableMentor(companyId, dateTime) {
         );
 
         if (!hasAppointment) {
-          return mentor.Correo_electronico;
+          return mentor;
         }
       }
     }

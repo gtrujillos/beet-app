@@ -172,29 +172,31 @@ Phone: ${data.phone}
             throw new Error("No available mentor");
           }
           
-          console.log("availableMentor", JSON.stringify(availableMentor));
-          console.log("flow_token", flow_token);
+          // console.log("availableMentor", JSON.stringify(availableMentor));
+          // console.log("flow_token", flow_token);
 
           const mentorAgendaRepository = new MentorAgendaRepository();
           const appointmentsByPhone = await mentorAgendaRepository.getAppointmentsByPhone(flow_token);
           
-          console.log("appointmentsByPhone", JSON.stringify(appointmentsByPhone));
+          // console.log("appointmentsByPhone", JSON.stringify(appointmentsByPhone));
 
+          const startDateTime = `${data.date}T${data.time}:00-05:00`;
           const eventDetails = {
-            summary: "Meeting with Mentor",
-            description: data.more_details,
-            startDateTime: `${data.date}T${data.time}:00-05:00`,
+            summary: "Capacitación Finanzas Consulting",
+            description: "Capacitación Finanzas Consulting", //data.more_details,
+            startDateTime: startDateTime,
             endDateTime: `${data.date}T${parseInt(data.time.split(":")[0]) + 1}:00:00-05:00`,
             timeZone: "America/Bogota",
             attendees: [
-              { email: availableMentor },
+              { email: availableMentor.Correo_electronico },
               { email: appointmentsByPhone[0].correo_electronico}
             ],
           };
-          
-          console.log(JSON.stringify(eventDetails));
 
-          await addEvent(companyId, eventDetails);
+          const eventData = await addEvent(companyId, eventDetails);
+          const meetLink = eventData.conferenceData?.entryPoints?.find(entry => entry.entryPointType === "video")?.uri;
+          await mentorAgendaRepository.updateAppointment(appointmentsByPhone[0].id, 'Agendado', availableMentor.id, meetLink, startDateTime);
+
         } catch (err) {
           console.error("Error creating event:", err);
           throw new Error("Error scheduling the appointment");

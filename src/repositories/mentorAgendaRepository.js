@@ -47,4 +47,20 @@ export class MentorAgendaRepository {
       throw err;
     }
   }
+
+  async updateAppointment(appointmentId, estado, mentores_id, link_agenda, fecha_agenda) {
+    try {
+      const client = await getDbConnectionAppointment();
+      const updated_at = new Date();
+      const query = `UPDATE public."nc_i3jc___Agendamientos"
+                     SET estado = $1, nc_i3jc___mentores_id = $2, link_agenda = $3, fecha_agenda = $4, updated_at = $5
+                     WHERE id = $6;`;
+      await client.query(query, [estado, mentores_id, link_agenda, fecha_agenda, updated_at, appointmentId]);
+      client.release();
+    } catch (err) {
+      console.error("Error updating appointment", err);
+      throw err;
+    }
+  }
+
 }
