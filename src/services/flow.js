@@ -1,6 +1,8 @@
-// 8. Events Controller (services/flow.js)
+// Events service (services/flow.js)
 
 import { findAvailableMentor } from "../services/googleCalendar.js";
+import { addEvent } from "../services/googleCalendar.js";
+import { MentorAgendaRepository } from "../repositories/mentorAgendaRepository.js";
 
 // this object is generated from Flow Builder under "..." > Endpoint > Snippets > Responses
 const SCREEN_RESPONSES = {
@@ -9,7 +11,7 @@ const SCREEN_RESPONSES = {
     data: {
       date: Array.from({ length: 8 }, (_, i) => {
         const date = new Date();
-        date.setDate(date.getDate() + i - 1);
+        date.setDate(date.getDate() + i);
         return {
           id: date.toISOString().split("T")[0],
           title: date.toDateString(),
@@ -20,8 +22,9 @@ const SCREEN_RESPONSES = {
         const hour = 8 + i;
         const amPmHour = hour <= 12 ? hour : hour - 12;
         const period = hour < 12 ? 'AM' : 'PM';
+        const hourId = hour < 10 ? `0${hour}:00` : `${hour}:00`; 
         return {
-          id: `${hour}:00`,
+          id: hourId,
           title: `${amPmHour}:00 ${period}`,
           enabled: true,
         };
@@ -120,7 +123,11 @@ export const getNextScreen = async (decryptedBody, companyId) => {
             time: await Promise.all(SCREEN_RESPONSES.APPOINTMENT.data.time.map(async (timeSlot, index) => {
               let enabled = true;
               if (data.date) {
-                const availableMentor = await findAvailableMentor(companyId, data.date);
+                
+                console.log('timeSlot.id', timeSlot.id)
+                
+                const dateTime = `${data.date}T${timeSlot.id}:00-05:00`;
+                const availableMentor = await findAvailableMentor(companyId, dateTime);
                 if (availableMentor === null) {
                   enabled = false; // Disable time slot if no available mentor
                 }
@@ -158,7 +165,41 @@ Phone: ${data.phone}
 
       // handles when user completes SUMMARY screen
       case "SUMMARY":
-        // TODO: save appointment to your database
+        try {
+          const availableMentor = await findAvailableMentor(companyId, data.date);
+          if (!availableMentor) {
+            console.error("No available mentor found for the selected date.");
+            throw new Error("No available mentor");
+          }
+          
+          console.log("availableMentor", JSON.stringify(availableMentor));
+          console.log("flow_token", flow_token);
+
+          const mentorAgendaRepository = new MentorAgendaRepository();
+          const appointmentsByPhone = await mentorAgendaRepository.getAppointmentsByPhone(flow_token);
+          
+          console.log("appointmentsByPhone", JSON.stringify(appointmentsByPhone));
+
+          const eventDetails = {
+            summary: "Meeting with Mentor",
+            description: data.more_details,
+            startDateTime: `${data.date}T${data.time}:00-05:00`,
+            endDateTime: `${data.date}T${parseInt(data.time.split(":")[0]) + 1}:00:00-05:00`,
+            timeZone: "America/Bogota",
+            attendees: [
+              { email: availableMentor },
+              { email: appointmentsByPhone[0].correo_electronico}
+            ],
+          };
+          
+          console.log(JSON.stringify(eventDetails));
+
+          await addEvent(companyId, eventDetails);
+        } catch (err) {
+          console.error("Error creating event:", err);
+          throw new Error("Error scheduling the appointment");
+        }
+
         // send success response to complete and close the flow
         return {
           ...SCREEN_RESPONSES.SUCCESS,

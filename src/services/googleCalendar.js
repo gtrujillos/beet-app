@@ -1,6 +1,9 @@
+// services/googleCalendar.js
+
 import { google } from "googleapis";
 import { MentorAgendaRepository } from "../repositories/mentorAgendaRepository.js";
 import { createOAuth2Client, handleTokenRefresh } from "../services/googleOAuth.js";
+import crypto from "crypto";
 
 export async function listEvents(companyId) {
   const auth = await createOAuth2Client(companyId);
@@ -20,12 +23,14 @@ export async function listEvents(companyId) {
   }
 }
 
-export async function addEvent(companyId) {
+export async function addEvent(companyId, eventDetails) {
   const auth = await createOAuth2Client(companyId);
   const calendar = google.calendar({ version: "v3", auth });
   try {
+    const requestId = crypto.randomUUID();
     const event = await calendar.events.insert({
       calendarId: "primary",
+      conferenceDataVersion: 1,
       resource: {
         summary: eventDetails.summary,
         description: eventDetails.description,
@@ -45,8 +50,24 @@ export async function addEvent(companyId) {
             { method: "popup", minutes: 10 },
           ],
         },
+        conferenceData: {
+          createRequest: {
+            requestId: requestId,
+            conferenceSolutionKey: {
+              type: "hangoutsMeet",
+            },
+          },
+        },
       },
     });
+
+    // Notify attendees with the meeting link
+    const meetLink = event.data.conferenceData?.entryPoints?.find(entry => entry.entryPointType === "video")?.uri;
+    if (meetLink) {
+      console.log("Google Meet link:", meetLink);
+      // Here you can add code to send notification to attendees with the meeting link
+    }
+
     return event.data;
   } catch (err) {
     console.error("Error adding event to Google Calendar:", err);
@@ -54,32 +75,50 @@ export async function addEvent(companyId) {
   }
 }
 
-export async function findAvailableMentor(companyId, date) {
+export async function findAvailableMentor(companyId, dateTime) {
   const auth = await createOAuth2Client(companyId);
   const calendar = google.calendar({ version: "v3", auth });
   const mentorAgendaRepository = new MentorAgendaRepository();
 
+  // console.log('dateTime:' + dateTime);
+  
   try {
-    // Get list of events for the given date
+    // Get list of events for the given date and time
     const events = await listEvents(companyId);
-    const eventsOnDate = events.filter(event =>
-      new Date(event.start.dateTime).toISOString().split('T')[0] === date
-    );
+    
+    // console.log('events:', events);
+    
+    const eventsOnDateTime = events.filter((event) => {
+      if (event.start && event.start.dateTime) {
+        const eventStart = new Date(event.start.dateTime).toISOString();
+        
+        console.log('dateTime:', dateTime);
+        
+        const providedDateTime = new Date(dateTime).toISOString();
+        return eventStart === providedDateTime;
+      }
+      return false;
+    });
+     
+    console.log('eventsOnDateTime:', eventsOnDateTime);
 
     // Get all mentors
     const mentors = await mentorAgendaRepository.getAllMentors();
 
-    // Find the first mentor without an appointment on the given date
+    // Find the first mentor without an appointment on the given date and time
     for (const mentor of mentors) {
-      const hasAppointment = eventsOnDate.some(event =>
-        event.attendees && event.attendees.some(attendee => attendee.email === mentor.Correo_electronico)
-      );
-      if (!hasAppointment) {
-        return mentor.Correo_electronico;
+      if (mentor.Correo_electronico) {
+        const hasAppointment = eventsOnDateTime.some(event =>
+          event.attendees && event.attendees.some(attendee => attendee.email === mentor.Correo_electronico)
+        );
+
+        if (!hasAppointment) {
+          return mentor.Correo_electronico;
+        }
       }
     }
 
-    // If all mentors have appointments on the given date, return null
+    // If all mentors have appointments on the given date and time, return null
     return null;
   } catch (err) {
     console.error("Error finding available mentor", err);
