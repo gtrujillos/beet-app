@@ -183,7 +183,7 @@ Phone: ${data.phone}
           const startDateTime = `${data.date}T${data.time}:00-05:00`;
           const eventDetails = {
             summary: "Capacitación Finanzas Consulting",
-            description: "Capacitación Finanzas Consulting", //data.more_details,
+            description: `Capacitación Finanzas Consulting con mentor ${availableMentor.Nombre}`, //data.more_details,
             startDateTime: startDateTime,
             endDateTime: `${data.date}T${parseInt(data.time.split(":")[0]) + 1}:00:00-05:00`,
             timeZone: "America/Bogota",
@@ -193,9 +193,9 @@ Phone: ${data.phone}
             ],
           };
 
-          const eventData = await addEvent(companyId, eventDetails);
-          const meetLink = eventData.conferenceData?.entryPoints?.find(entry => entry.entryPointType === "video")?.uri;
-          await mentorAgendaRepository.updateAppointment(appointmentsByPhone[0].id, 'Agendado', availableMentor.id, meetLink, startDateTime);
+          const eventData = await addEvent(companyId, eventDetails, appointmentsByPhone[0].id, availableMentor.id);
+          // const meetLink = eventData.conferenceData?.entryPoints?.find(entry => entry.entryPointType === "video")?.uri;
+          // await mentorAgendaRepository.updateAppointment(appointmentsByPhone[0].id, 'Agendado', availableMentor.id, meetLink, startDateTime);
 
         } catch (err) {
           console.error("Error creating event:", err);

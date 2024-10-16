@@ -23,7 +23,7 @@ export async function listEvents(companyId) {
   }
 }
 
-export async function addEvent(companyId, eventDetails) {
+export async function addEvent(companyId, eventDetails, appointmentsId, mentorId) {
   const auth = await createOAuth2Client(companyId);
   const calendar = google.calendar({ version: "v3", auth });
   try {
@@ -67,6 +67,9 @@ export async function addEvent(companyId, eventDetails) {
       console.log("Google Meet link:", meetLink);
       // Here you can add code to send notification to attendees with the meeting link
     }
+
+    const mentorAgendaRepository = new MentorAgendaRepository();
+    await mentorAgendaRepository.updateAppointment(appointmentsId, 'Agendado', mentorId, meetLink, eventDetails.startDateTime);
 
     return event.data;
   } catch (err) {
