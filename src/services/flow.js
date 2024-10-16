@@ -10,94 +10,31 @@ const SCREEN_RESPONSES = {
   APPOINTMENT: {
     screen: "APPOINTMENT",
     data: {
-      department: [
-        {
-          id: "shopping",
-          title: "Shopping & Groceries",
-        },
-        {
-          id: "clothing",
-          title: "Clothing & Apparel",
-        },
-        {
-          id: "home",
-          title: "Home Goods & Decor",
-        },
-        {
-          id: "electronics",
-          title: "Electronics & Appliances",
-        },
-        {
-          id: "beauty",
-          title: "Beauty & Personal Care",
-        },
-      ],
-      location: [
-        {
-          id: "1",
-          title: "King\u2019s Cross, London",
-        },
-        {
-          id: "2",
-          title: "Oxford Street, London",
-        },
-        {
-          id: "3",
-          title: "Covent Garden, London",
-        },
-        {
-          id: "4",
-          title: "Piccadilly Circus, London",
-        },
-      ],
-      is_location_enabled: true,
-      date: [
-        {
-          id: "2024-01-01",
-          title: "Mon Jan 01 2024",
-        },
-        {
-          id: "2024-01-02",
-          title: "Tue Jan 02 2024",
-        },
-        {
-          id: "2024-01-03",
-          title: "Wed Jan 03 2024",
-        },
-      ],
+      date: Array.from({ length: 8 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() + i - 1);
+        return {
+          id: date.toISOString().split("T")[0],
+          title: date.toDateString(),
+        };
+      }),
       is_date_enabled: true,
-      time: [
-        {
-          id: "10:30",
-          title: "10:30",
-        },
-        {
-          id: "11:00",
-          title: "11:00",
-          enabled: false,
-        },
-        {
-          id: "11:30",
-          title: "11:30",
-        },
-        {
-          id: "12:00",
-          title: "12:00",
-          enabled: false,
-        },
-        {
-          id: "12:30",
-          title: "12:30",
-        },
-      ],
-      is_time_enabled: true,
+      time: Array.from({ length: 13 }, (_, i) => {
+        const hour = 8 + i;
+        const amPmHour = hour <= 12 ? hour : hour - 12;
+        const period = hour < 12 ? 'AM' : 'PM';
+        return {
+          id: `${hour}:00`,
+          title: `${amPmHour}:00 ${period}`,
+          enabled: true,
+        };
+      }),
+      is_time_enabled: false,
     },
   },
   DETAILS: {
     screen: "DETAILS",
     data: {
-      department: "beauty",
-      location: "1",
       date: "2024-01-01",
       time: "11:30",
     },
@@ -105,12 +42,8 @@ const SCREEN_RESPONSES = {
   SUMMARY: {
     screen: "SUMMARY",
     data: {
-      appointment:
-        "Beauty & Personal Care Department at Kings Cross, London\nMon Jan 01 2024 at 11:30.",
-      details:
-        "Name: John Doe\nEmail: john@example.com\nPhone: 123456789\n\nA free skin care consultation, please",
-      department: "beauty",
-      location: "1",
+      appointment: "Mon Jan 01 2024 at 11:30.",
+      details: "Name: John Doe\nEmail: john@example.com\nPhone: 123456789\n\nA free skin care consultation, please",
       date: "2024-01-01",
       time: "11:30",
       name: "John Doe",
@@ -164,8 +97,7 @@ export const getNextScreen = async (decryptedBody) => {
       data: {
         ...SCREEN_RESPONSES.APPOINTMENT.data,
         // these fields are disabled initially. Each field is enabled when previous fields are selected
-        is_location_enabled: false,
-        is_date_enabled: false,
+        is_date_enabled: true,
         is_time_enabled: false,
       },
     };
@@ -183,36 +115,38 @@ export const getNextScreen = async (decryptedBody) => {
             // copy initial screen data then override specific fields
             ...SCREEN_RESPONSES.APPOINTMENT.data,
             // each field is enabled only when previous fields are selected
-            is_location_enabled: Boolean(data.department),
-            is_date_enabled: Boolean(data.department) && Boolean(data.location),
-            is_time_enabled:
-              Boolean(data.department) &&
-              Boolean(data.location) &&
-              Boolean(data.date),
+            is_date_enabled: Boolean(data.date),
+            is_time_enabled: Boolean(data.date),
 
-            //TODO: filter each field options based on current selection, here we filter randomly instead
-            location: SCREEN_RESPONSES.APPOINTMENT.data.location.slice(0, 3),
-            date: SCREEN_RESPONSES.APPOINTMENT.data.date.slice(0, 3),
-            time: SCREEN_RESPONSES.APPOINTMENT.data.time.slice(0, 3),
+            // filter each field options based on current selection
+            date: SCREEN_RESPONSES.APPOINTMENT.data.date,
+            time: SCREEN_RESPONSES.APPOINTMENT.data.time.map((timeSlot, index) => {
+              let enabled = true;
+              if (data.date) {
+                const selectedDateIndex = SCREEN_RESPONSES.APPOINTMENT.data.date.findIndex(
+                  (date) => date.id === data.date
+                );
+                if (selectedDateIndex === 0 && index === 1) {
+                  enabled = false; // Disable second hour for the first day
+                } else if (selectedDateIndex === 1 && (index === 2 || index === 3)) {
+                  enabled = false; // Disable third and fourth hour for the second day
+                }
+              }
+              return {
+                ...timeSlot,
+                enabled,
+              };
+            }),
           },
         };
 
       // handles when user completes DETAILS screen
       case "DETAILS":
-        // the client payload contains selected ids from dropdown lists, we need to map them to names to display to user
-        const departmentName =
-          SCREEN_RESPONSES.APPOINTMENT.data.department.find(
-            (dept) => dept.id === data.department
-          ).title;
-        const locationName = SCREEN_RESPONSES.APPOINTMENT.data.location.find(
-          (loc) => loc.id === data.location
-        ).title;
         const dateName = SCREEN_RESPONSES.APPOINTMENT.data.date.find(
           (date) => date.id === data.date
         ).title;
 
-        const appointment = `${departmentName} at ${locationName}
-${dateName} at ${data.time}`;
+        const appointment = `${dateName} at ${data.time}`;
 
         const details = `Name: ${data.name}
 Email: ${data.email}

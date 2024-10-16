@@ -17,26 +17,6 @@ export async function listEvents(auth) {
   }
 }
 
-// export async function listEvents(auth) {
-
-//   // console.log('listEvents auth', auth);
-
-//   const calendar = google.calendar({ version: 'v3', auth });
-//   try {
-//     const res = await calendar.events.list({
-//       calendarId: 'primary',
-//       timeMin: (new Date()).toISOString(),
-//       maxResults: 10,
-//       singleEvents: true,
-//       orderBy: 'startTime',
-//     });
-//     return res.data.items;
-//   } catch (err) {
-//     console.error('The API returned an error:', err);
-//     throw new Error('Error loading events');
-//   }
-// }
-
 export async function addEvent(auth, eventDetails) {
   const calendar = google.calendar({ version: "v3", auth });
   try {
@@ -47,11 +27,11 @@ export async function addEvent(auth, eventDetails) {
         description: eventDetails.description,
         start: {
           dateTime: eventDetails.startDateTime,
-          timeZone: eventDetails.timeZone || "America/Los_Angeles",
+          timeZone: eventDetails.timeZone || "America/Bogota",
         },
         end: {
           dateTime: eventDetails.endDateTime,
-          timeZone: eventDetails.timeZone || "America/Los_Angeles",
+          timeZone: eventDetails.timeZone || "America/Bogota",
         },
         attendees: eventDetails.attendees || [],
         reminders: {
