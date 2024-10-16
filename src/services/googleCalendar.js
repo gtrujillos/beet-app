@@ -1,6 +1,9 @@
 import { google } from "googleapis";
+import { MentorAgendaRepository } from "../repositories/mentorAgendaRepository.js";
+import { createOAuth2Client, handleTokenRefresh } from "../services/googleOAuth.js";
 
-export async function listEvents(auth) {
+export async function listEvents(companyId) {
+  const auth = await createOAuth2Client(companyId);
   const calendar = google.calendar({ version: "v3", auth });
   try {
     const res = await calendar.events.list({
@@ -17,7 +20,8 @@ export async function listEvents(auth) {
   }
 }
 
-export async function addEvent(auth, eventDetails) {
+export async function addEvent(companyId) {
+  const auth = await createOAuth2Client(companyId);
   const calendar = google.calendar({ version: "v3", auth });
   try {
     const event = await calendar.events.insert({
@@ -47,5 +51,38 @@ export async function addEvent(auth, eventDetails) {
   } catch (err) {
     console.error("Error adding event to Google Calendar:", err);
     throw err;
+  }
+}
+
+export async function findAvailableMentor(companyId, date) {
+  const auth = await createOAuth2Client(companyId);
+  const calendar = google.calendar({ version: "v3", auth });
+  const mentorAgendaRepository = new MentorAgendaRepository();
+
+  try {
+    // Get list of events for the given date
+    const events = await listEvents(companyId);
+    const eventsOnDate = events.filter(event =>
+      new Date(event.start.dateTime).toISOString().split('T')[0] === date
+    );
+
+    // Get all mentors
+    const mentors = await mentorAgendaRepository.getAllMentors();
+
+    // Find the first mentor without an appointment on the given date
+    for (const mentor of mentors) {
+      const hasAppointment = eventsOnDate.some(event =>
+        event.attendees && event.attendees.some(attendee => attendee.email === mentor.Correo_electronico)
+      );
+      if (!hasAppointment) {
+        return mentor.Correo_electronico;
+      }
+    }
+
+    // If all mentors have appointments on the given date, return null
+    return null;
+  } catch (err) {
+    console.error("Error finding available mentor", err);
+    throw new Error("Error finding available mentor");
   }
 }

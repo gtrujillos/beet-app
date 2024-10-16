@@ -1,9 +1,4 @@
-/**
- * Copyright (c) Meta Platforms, Inc. and affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
+// 8. Events Controller (services/flow.js)
 
 // this object is generated from Flow Builder under "..." > Endpoint > Snippets > Responses
 const SCREEN_RESPONSES = {
@@ -155,7 +150,7 @@ Phone: ${data.phone}
 
         return {
           ...SCREEN_RESPONSES.SUMMARY,
-          data: {
+          data: { 
             appointment,
             details,
             // return the same fields sent from client back to submit in the next step

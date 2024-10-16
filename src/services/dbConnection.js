@@ -17,9 +17,26 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
 });
 
+const poolAppointment = new Pool({
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME_APPOINTMENT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
+
 export const getDbConnection = async () => {
   try {
     const client = await pool.connect();
+    return client;
+  } catch (err) {
+    console.error("Error connecting to the database", err);
+    throw err;
+  }
+};
+
+export const getDbConnectionAppointment = async () => {
+  try {
+    const client = await poolAppointment.connect();
     return client;
   } catch (err) {
     console.error("Error connecting to the database", err);
