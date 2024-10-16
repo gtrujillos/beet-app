@@ -1,5 +1,7 @@
 // 8. Events Controller (services/flow.js)
 
+import { findAvailableMentor } from "../services/googleCalendar.js";
+
 // this object is generated from Flow Builder under "..." > Endpoint > Snippets > Responses
 const SCREEN_RESPONSES = {
   APPOINTMENT: {
@@ -14,14 +16,19 @@ const SCREEN_RESPONSES = {
         };
       }),
       is_date_enabled: true,
-      time: Array.from({ length: 13 }, (_, i) => {
+      time: Array.from({ length: 13 }, async (_, i) => {
         const hour = 8 + i;
         const amPmHour = hour <= 12 ? hour : hour - 12;
         const period = hour < 12 ? 'AM' : 'PM';
+        const timeId = `${hour}:00`;
+        const date = SCREEN_RESPONSES.APPOINTMENT.data.date[0].id; // Assuming date is selected from the first date
+        const availableMentor = await findAvailableMentor(date);
+        const enabled = availableMentor !== null;
+
         return {
-          id: `${hour}:00`,
+          id: timeId,
           title: `${amPmHour}:00 ${period}`,
-          enabled: true,
+          enabled,
         };
       }),
       is_time_enabled: false,
@@ -115,23 +122,19 @@ export const getNextScreen = async (decryptedBody) => {
 
             // filter each field options based on current selection
             date: SCREEN_RESPONSES.APPOINTMENT.data.date,
-            time: SCREEN_RESPONSES.APPOINTMENT.data.time.map((timeSlot, index) => {
+            time: await Promise.all(SCREEN_RESPONSES.APPOINTMENT.data.time.map(async (timeSlot, index) => {
               let enabled = true;
               if (data.date) {
-                const selectedDateIndex = SCREEN_RESPONSES.APPOINTMENT.data.date.findIndex(
-                  (date) => date.id === data.date
-                );
-                if (selectedDateIndex === 0 && index === 1) {
-                  enabled = false; // Disable second hour for the first day
-                } else if (selectedDateIndex === 1 && (index === 2 || index === 3)) {
-                  enabled = false; // Disable third and fourth hour for the second day
+                const availableMentor = await findAvailableMentor(data.date);
+                if (availableMentor === null) {
+                  enabled = false; // Disable time slot if no available mentor
                 }
               }
               return {
                 ...timeSlot,
                 enabled,
               };
-            }),
+            })),
           },
         };
 
