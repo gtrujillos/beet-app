@@ -9,14 +9,20 @@ const SCREEN_RESPONSES = {
   APPOINTMENT: {
     screen: "APPOINTMENT",
     data: {
-      date: Array.from({ length: 8 }, (_, i) => {
+      date: Array.from({ length: 14 }, (_, i) => {
         const date = new Date();
-        date.setDate(date.getDate() + i);
+        let addedDays = 1;
+        while (addedDays < i + 1) {
+          date.setDate(date.getDate() + 1);
+          if (date.getDay() !== 0) { // Skip Sundays
+            addedDays++;
+          }
+        }
         return {
           id: date.toISOString().split("T")[0],
-          title: date.toDateString(),
+          title: date.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
         };
-      }),
+      }).slice(0, 8),
       is_date_enabled: true,
       time: Array.from({ length: 13 }, (_, i) => {
         const hour = 8 + i;
@@ -29,6 +35,7 @@ const SCREEN_RESPONSES = {
           enabled: true,
         };
       }),
+      appointment: "Mon Jan 13 2024 at 11:30.",
       is_time_enabled: false,
     },
   },
@@ -42,7 +49,7 @@ const SCREEN_RESPONSES = {
   SUMMARY: {
     screen: "SUMMARY",
     data: {
-      appointment: "Mon Jan 01 2024 at 11:30.",
+      appointment: "Mon Jan 11 2024 at 11:30.",
       details: "Name: John Doe\nEmail: john@example.com\nPhone: 123456789\n\nA free skin care consultation, please",
       date: "2024-01-01",
       time: "11:30",
@@ -124,11 +131,15 @@ export const getNextScreen = async (decryptedBody, companyId) => {
               let enabled = true;
               if (data.date) {
                 
-                console.log('timeSlot.id', timeSlot.id)
+                // console.log('timeSlot.id', timeSlot.id);
                 
                 const dateTime = `${data.date}T${timeSlot.id}:00-05:00`;
                 const availableMentor = await findAvailableMentor(companyId, dateTime);
-                if (availableMentor === null) {
+                
+                // console.log('dateTime', dateTime);
+                // console.log('availableMentor', availableMentor);
+                
+                if (availableMentor === null || new Date(dateTime) < new Date()) {
                   enabled = false; // Disable time slot if no available mentor
                 }
               }
@@ -137,6 +148,7 @@ export const getNextScreen = async (decryptedBody, companyId) => {
                 enabled,
               };
             })),
+            appointment: "Mon Jan 02 2024 at 11:30.",
           },
         };
 
@@ -148,16 +160,16 @@ export const getNextScreen = async (decryptedBody, companyId) => {
 
         const appointment = `${dateName} at ${data.time}`;
 
-        const details = `Name: ${data.name}
-Email: ${data.email}
-Phone: ${data.phone}
-"${data.more_details}"`;
+//         const details = `Name: ${data.name}
+// Email: ${data.email}
+// Phone: ${data.phone}
+// "${data.more_details}"`;
 
         return {
           ...SCREEN_RESPONSES.SUMMARY,
           data: { 
             appointment,
-            details,
+            // details,
             // return the same fields sent from client back to submit in the next step
             ...data,
           },

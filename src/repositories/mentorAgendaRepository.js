@@ -9,7 +9,7 @@ export class MentorAgendaRepository {
     try {
       const client = await getDbConnectionAppointment();
       const query = `SELECT id, "Nombre", created_at, updated_at, created_by, updated_by, "Telefono", "Profesion", disp_lunes, "Correo_electronico", nc_i3jc___lineas_atencion_id, "Calendario"
-                    FROM public.nc_i3jc___mentores  order by id desc;`;
+                    FROM public.nc_i3jc___mentores where id = 16  ORDER BY RANDOM();`;
       const res = await client.query(query);
       client.release();
       return res.rows;

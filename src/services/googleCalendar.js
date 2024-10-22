@@ -9,10 +9,13 @@ export async function listEvents(companyId) {
   const auth = await createOAuth2Client(companyId);
   const calendar = google.calendar({ version: "v3", auth });
   try {
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 8);
     const res = await calendar.events.list({
       calendarId: "primary",
       timeMin: new Date().toISOString(),
-      maxResults: 10,
+      timeMax: maxDate.toISOString(),
+      maxResults: 1000,
       singleEvents: true,
       orderBy: "startTime",
     });
@@ -85,6 +88,7 @@ export async function findAvailableMentor(companyId, dateTime) {
 
   // console.log('dateTime:' + dateTime);
   
+  
   try {
     // Get list of events for the given date and time
     const events = await listEvents(companyId);
@@ -93,20 +97,30 @@ export async function findAvailableMentor(companyId, dateTime) {
     
     const eventsOnDateTime = events.filter((event) => {
       if (event.start && event.start.dateTime) {
+        
+        // console.log('d1:', event.start.dateTime);
+        // console.log('d2:', dateTime);
+        
+        
         const eventStart = new Date(event.start.dateTime).toISOString();
-        
-        console.log('dateTime:', dateTime);
-        
         const providedDateTime = new Date(dateTime).toISOString();
+        
+        // console.log('eventStart:', eventStart);
+        // console.log('providedDateTime:', providedDateTime);
+        
+        
         return eventStart === providedDateTime;
       }
       return false;
     });
      
-    // console.log('eventsOnDateTime:', eventsOnDateTime);
-
+    console.log('d2:', dateTime);
+    console.log('eventsOnDateTime:', eventsOnDateTime);
+    
     // Get all mentors
     const mentors = await mentorAgendaRepository.getAllMentors();
+    // console.log('mentors:', mentors);
+    
 
     // Find the first mentor without an appointment on the given date and time
     for (const mentor of mentors) {

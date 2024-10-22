@@ -9,7 +9,7 @@ export class WhatsAppRepository {
     try {
       const client = await getDbConnection();
       const res = await client.query(
-        "SELECT private_key, passphrase, app_secret FROM whatsapp WHERE company_id = $1",
+        "SELECT private_key, passphrase, app_secret FROM whatsapp WHERE company_id = $1 order by date_created desc",
         [companyId]
       );
       client.release();
