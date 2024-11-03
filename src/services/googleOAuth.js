@@ -33,7 +33,16 @@ export async function handleTokenRefresh(oAuth2Client, companyId) {
   oAuth2Client.on("tokens", async (tokens) => {
     console.log("tokens", tokens);
     try {
-      await googleAuthRepository.updateTokensByCompanyId(companyId, tokens);
+      if (tokens.refresh_token) {
+        // Save both access and refresh tokens
+        await googleAuthRepository.updateTokensByCompanyId(companyId, tokens);
+      } else {
+        // Only update the access token
+        await googleAuthRepository.updateTokensByCompanyId(companyId, {
+          access_token: tokens.access_token,
+          expiry_date: tokens.expiry_date,
+        });
+      }
     } catch (err) {
       console.error("Error updating tokens in the database", err);
     }
@@ -52,9 +61,24 @@ export async function setClientCredentials(oAuth2Client, companyId) {
         token_type: token.google_token_type || undefined,
         expiry_date: token.google_expiry_date || undefined,
       });
+
+      // Attempt to refresh the token if it's expired or close to expiring
+      if (Date.now() > token.google_expiry_date - 60000) { // Refresh if expiry is within 1 minute
+        try {
+          const response = await oAuth2Client.refreshAccessToken();
+          const { credentials } = response;
+          console.log("Access token refreshed successfully", credentials);
+          await googleAuthRepository.updateTokensByCompanyId(companyId, credentials);
+          oAuth2Client.setCredentials(credentials); // Update OAuth client with new credentials
+        } catch (refreshError) {
+          console.error("Error refreshing access token", refreshError);
+          throw new Error("Authentication required. Please re-authenticate.");
+        }
+      }
     }
   } catch (err) {
     console.error("Error setting client credentials", err);
     throw err;
   }
 }
+

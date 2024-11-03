@@ -61,18 +61,20 @@ export async function addEvent(companyId, eventDetails, appointmentsId, mentorId
             },
           },
         },
+        visibility: "public"
       },
     });
 
     // Notify attendees with the meeting link
     const meetLink = event.data.conferenceData?.entryPoints?.find(entry => entry.entryPointType === "video")?.uri;
     if (meetLink) {
-      console.log("Google Meet link:", meetLink);
+      // console.log("Google Meet link:", meetLink);
       // Here you can add code to send notification to attendees with the meeting link
     }
 
     const mentorAgendaRepository = new MentorAgendaRepository();
-    await mentorAgendaRepository.updateAppointment(appointmentsId, 'Agendado', mentorId, meetLink, eventDetails.startDateTime);
+    const startDateTimeUtc = new Date(eventDetails.startDateTime).toISOString();
+    await mentorAgendaRepository.updateAppointment(appointmentsId, 'Agendado', mentorId, meetLink, startDateTimeUtc);
 
     return event.data;
   } catch (err) {
@@ -114,8 +116,8 @@ export async function findAvailableMentor(companyId, dateTime) {
       return false;
     });
      
-    console.log('d2:', dateTime);
-    console.log('eventsOnDateTime:', eventsOnDateTime);
+    //console.log('d2:', dateTime);
+    //console.log('eventsOnDateTime:', eventsOnDateTime);
     
     // Get all mentors
     const mentors = await mentorAgendaRepository.getAllMentors();

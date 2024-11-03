@@ -9,20 +9,36 @@ const SCREEN_RESPONSES = {
   APPOINTMENT: {
     screen: "APPOINTMENT",
     data: {
-      date: Array.from({ length: 14 }, (_, i) => {
-        const date = new Date();
-        let addedDays = 1;
-        while (addedDays < i + 1) {
-          date.setDate(date.getDate() + 1);
-          if (date.getDay() !== 0) { // Skip Sundays
-            addedDays++;
+      date: (() => {
+        var result = [];
+        const today = new Date();
+
+        console.log('today', today);
+
+        if (today.getDay() !== 0) { // Include today if it's not Sunday
+          result.push({
+            id: today.toISOString().split("T")[0],
+            title: today.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+          });
+        }
+
+        for (let i = 1; i <= 13; i++) { // Collect dates for 14 days, excluding Sundays
+          const date = new Date(today);
+          date.setDate(today.getDate() + i);
+
+          if (date.getDay() !== 0) { // Exclude Sundays (0 represents Sunday)
+            result.push({
+              id: date.toISOString().split("T")[0],
+              title: date.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+            });
           }
         }
-        return {
-          id: date.toISOString().split("T")[0],
-          title: date.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-        };
-      }).slice(0, 8),
+
+        result = result.slice(0, 8);
+        console.log("Days result", result);
+
+        return result; // Limit to 8 dates
+      })(),
       is_date_enabled: true,
       time: Array.from({ length: 13 }, (_, i) => {
         const hour = 8 + i;
@@ -131,15 +147,19 @@ export const getNextScreen = async (decryptedBody, companyId) => {
               let enabled = true;
               if (data.date) {
                 
+                // console.log('index', index);
                 // console.log('timeSlot.id', timeSlot.id);
                 
                 const dateTime = `${data.date}T${timeSlot.id}:00-05:00`;
                 const availableMentor = await findAvailableMentor(companyId, dateTime);
+                const [hours, minutes] = timeSlot.id.split(':').map(Number);
                 
-                // console.log('dateTime', dateTime);
+                //console.log('dateTime', dateTime);
                 // console.log('availableMentor', availableMentor);
+                //console.log('Date', new Date(dateTime));
+                //console.log('getHours', new Date(dateTime).getHours());
                 
-                if (availableMentor === null || new Date(dateTime) < new Date()) {
+                if (availableMentor === null || new Date(dateTime) < new Date() || (new Date(dateTime).getDay() === 6 && hours >= 12)) {
                   enabled = false; // Disable time slot if no available mentor
                 }
               }
@@ -159,11 +179,6 @@ export const getNextScreen = async (decryptedBody, companyId) => {
         ).title;
 
         const appointment = `${dateName} at ${data.time}`;
-
-//         const details = `Name: ${data.name}
-// Email: ${data.email}
-// Phone: ${data.phone}
-// "${data.more_details}"`;
 
         return {
           ...SCREEN_RESPONSES.SUMMARY,
@@ -194,8 +209,8 @@ export const getNextScreen = async (decryptedBody, companyId) => {
 
           const startDateTime = `${data.date}T${data.time}:00-05:00`;
           const eventDetails = {
-            summary: "Capacitación Finanzas Consulting",
-            description: `Capacitación Finanzas Consulting con mentor ${availableMentor.Nombre}`, //data.more_details,
+            summary: `Capacitación ${appointmentsByPhone[0].title}`,
+            description: `Capacitación ${appointmentsByPhone[0].title} con mentor ${availableMentor.Nombre}`,
             startDateTime: startDateTime,
             endDateTime: `${data.date}T${parseInt(data.time.split(":")[0]) + 1}:00:00-05:00`,
             timeZone: "America/Bogota",
@@ -206,8 +221,6 @@ export const getNextScreen = async (decryptedBody, companyId) => {
           };
 
           const eventData = await addEvent(companyId, eventDetails, appointmentsByPhone[0].id, availableMentor.id);
-          // const meetLink = eventData.conferenceData?.entryPoints?.find(entry => entry.entryPointType === "video")?.uri;
-          // await mentorAgendaRepository.updateAppointment(appointmentsByPhone[0].id, 'Agendado', availableMentor.id, meetLink, startDateTime);
 
         } catch (err) {
           console.error("Error creating event:", err);

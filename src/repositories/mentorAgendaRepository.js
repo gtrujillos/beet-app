@@ -9,7 +9,7 @@ export class MentorAgendaRepository {
     try {
       const client = await getDbConnectionAppointment();
       const query = `SELECT id, "Nombre", created_at, updated_at, created_by, updated_by, "Telefono", "Profesion", disp_lunes, "Correo_electronico", nc_i3jc___lineas_atencion_id, "Calendario"
-                    FROM public.nc_i3jc___mentores where id = 16  ORDER BY RANDOM();`;
+                    FROM public.nc_i3jc___mentores where 16 = 16  ORDER BY RANDOM();`;
       const res = await client.query(query);
       client.release();
       return res.rows;
@@ -35,10 +35,16 @@ export class MentorAgendaRepository {
 
   async getAppointmentsByPhone(phone) {
     try {
+      if (phone.startsWith('+')) {
+        phone = phone.substring(1);
+      }
       const client = await getDbConnectionAppointment();
-      const query = `SELECT id, id_ticket_cliente, created_at, updated_at, created_by, updated_by, estado, tipo_novedad, notas, fecha_agenda, nc_i3jc___mentores_id, nc_i3jc___lineas_atencion_id, nombre_completo, telefono, correo_electronico, intentos_contacto, link_agenda, programa_sesion
-                    FROM public."nc_i3jc___Agendamientos"
-                    WHERE telefono = $1;`;
+      const query = `SELECT a.id, a.id_ticket_cliente, a.created_at, a.updated_at, a.created_by, a.updated_by, 
+                            a.estado, a.tipo_novedad, a.notas, a.fecha_agenda, a.nc_i3jc___mentores_id, a.nc_i3jc___lineas_atencion_id, 
+                            a.nombre_completo, a.telefono, a.correo_electronico, a.intentos_contacto, a.link_agenda, a.programa_sesion, l.title
+                    FROM public."nc_i3jc___Agendamientos" a
+                    JOIN public.nc_i3jc___lineas_atencion l ON a.nc_i3jc___lineas_atencion_id = l.id
+                    WHERE a.telefono = $1;`;
       const res = await client.query(query, [phone]);
       client.release();
       return res.rows;
