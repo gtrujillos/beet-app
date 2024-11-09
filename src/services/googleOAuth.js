@@ -10,6 +10,7 @@ dotenv.config();
 
 const googleAuthRepository = new GoogleAuthRepository();
 
+// Create OAuth2 Client for a specific company
 export async function createOAuth2Client(companyId) {
   try {
     const clientId = await googleAuthRepository.getClientIdByCompanyId(companyId);
@@ -28,7 +29,7 @@ export async function createOAuth2Client(companyId) {
   }
 }
 
-// Example usage of updating tokens in the database when tokens are refreshed
+// Handle token refresh when new tokens are received
 export async function handleTokenRefresh(oAuth2Client, companyId) {
   oAuth2Client.on("tokens", async (tokens) => {
     console.log("tokens", tokens);
@@ -63,7 +64,7 @@ export async function setClientCredentials(oAuth2Client, companyId) {
       });
 
       // Attempt to refresh the token if it's expired or close to expiring
-      if (Date.now() > token.google_expiry_date - 60000) { // Refresh if expiry is within 1 minute
+      if (Date.now() > token.google_expiry_date - 300000) { // Refresh if expiry is within 5 minutes
         try {
           const response = await oAuth2Client.refreshAccessToken();
           const { credentials } = response;
@@ -82,3 +83,43 @@ export async function setClientCredentials(oAuth2Client, companyId) {
   }
 }
 
+// Renew token using the refresh token if needed
+export async function renewTokenWithRefreshToken(companyId) {
+  try {
+    // Get the clientId, clientSecret, and redirectUri from the database
+    const clientId = await googleAuthRepository.getClientIdByCompanyId(companyId);
+    const clientSecret = await googleAuthRepository.getClientSecretByCompanyId(companyId);
+    const redirectUri = await googleAuthRepository.getRedirectUriByCompanyId(companyId);
+
+    // Create OAuth2Client
+    const oAuth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+
+    // Get the stored tokens 
+    const token = await googleAuthRepository.getTokensByCompanyId(companyId);
+
+    if (token && token.google_refresh_token) {
+      // Set the refresh token for the OAuth2 client
+      oAuth2Client.setCredentials({
+        refresh_token: token.google_refresh_token,
+      });
+
+      // Attempt to refresh the access token
+      const response = await oAuth2Client.refreshAccessToken();
+      const { credentials } = response;
+
+      console.log("Access token refreshed successfully", credentials);
+
+      // Update the database with the new tokens
+      await googleAuthRepository.updateTokensByCompanyId(companyId, credentials);
+
+      // Return the new OAuth2Client with updated credentials
+      oAuth2Client.setCredentials(credentials);
+      return oAuth2Client;
+    } else {
+      throw new Error("No refresh token found. Re-authentication required.");
+    }
+  } catch (err) {
+    console.error("Error renewing token using refresh token", err);
+    throw err;
+  }
+}

@@ -3,97 +3,106 @@
 import { findAvailableMentor } from "../services/googleCalendar.js";
 import { addEvent } from "../services/googleCalendar.js";
 import { MentorAgendaRepository } from "../repositories/mentorAgendaRepository.js";
+import moment from 'moment-timezone';
 
 // this object is generated from Flow Builder under "..." > Endpoint > Snippets > Responses
-const SCREEN_RESPONSES = {
-  APPOINTMENT: {
-    screen: "APPOINTMENT",
-    data: {
-      date: (() => {
-        var result = [];
-        const today = new Date();
+let SCREEN_RESPONSES = {};
 
-        console.log('today', today);
+export const fillData = () => {
+  SCREEN_RESPONSES = {
+    APPOINTMENT: {
+      screen: "APPOINTMENT",
+      data: {
+        date: (() => {
+          const result = [];
+          const bogotaTimeZone = 'America/Bogota';
 
-        if (today.getDay() !== 0) { // Include today if it's not Sunday
-          result.push({
-            id: today.toISOString().split("T")[0],
-            title: today.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-          });
-        }
+          // Get the current date and time in the Bogotá time zone
+          const today = moment.tz(bogotaTimeZone);
 
-        for (let i = 1; i <= 13; i++) { // Collect dates for 14 days, excluding Sundays
-          const date = new Date(today);
-          date.setDate(today.getDate() + i);
-
-          if (date.getDay() !== 0) { // Exclude Sundays (0 represents Sunday)
+          // Include today if it's not Sunday
+          if (today.day() !== 0) { // 0 represents Sunday
             result.push({
-              id: date.toISOString().split("T")[0],
-              title: date.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+              id: today.format('YYYY-MM-DD'), // Get the date in ISO format
+              title: today.format('dddd, D [de] MMMM [de] YYYY'), // Format in Spanish
             });
           }
-        }
 
-        result = result.slice(0, 8);
-        console.log("Days result", result);
+          // Collect dates for the next 13 days, excluding Sundays
+          for (let i = 1; i <= 13; i++) {
+            const date = today.clone().add(i, 'days'); // Clone today and add i days
 
-        return result; // Limit to 8 dates
-      })(),
-      is_date_enabled: true,
-      time: Array.from({ length: 13 }, (_, i) => {
-        const hour = 8 + i;
-        const amPmHour = hour <= 12 ? hour : hour - 12;
-        const period = hour < 12 ? 'AM' : 'PM';
-        const hourId = hour < 10 ? `0${hour}:00` : `${hour}:00`; 
-        return {
-          id: hourId,
-          title: `${amPmHour}:00 ${period}`,
-          enabled: true,
-        };
-      }),
-      appointment: "Mon Jan 13 2024 at 11:30.",
-      is_time_enabled: false,
+            if (date.day() !== 0) { // Exclude Sundays (0 represents Sunday)
+              result.push({
+                id: date.format('YYYY-MM-DD'), // Get the date in ISO format
+                title: date.format('dddd, D [de] MMMM [de] YYYY'), // Format in Spanish
+              });
+            }
+          }
+
+          // console.log('days: ', result)
+
+          return result.slice(0, 4); // Return the first 4 dates
+        })(),
+        is_date_enabled: true,
+        time: Array.from({ length: 13 }, (_, i) => {
+          const hour = 8 + i;
+          const amPmHour = hour <= 12 ? hour : hour - 12;
+          const period = hour < 12 ? 'AM' : 'PM';
+          const hourId = hour < 10 ? `0${hour}:00` : `${hour}:00`; 
+          return {
+            id: hourId,
+            title: `${amPmHour}:00 ${period}`,
+            enabled: true,
+          };
+        }),
+        appointment: "Mon Jan 13 2024 at 11:30.",
+        is_time_enabled: false,
+      },
     },
-  },
-  DETAILS: {
-    screen: "DETAILS",
-    data: {
-      date: "2024-01-01",
-      time: "11:30",
+    DETAILS: {
+      screen: "DETAILS",
+      data: {
+        date: "2024-01-01",
+        time: "11:30",
+      },
     },
-  },
-  SUMMARY: {
-    screen: "SUMMARY",
-    data: {
-      appointment: "Mon Jan 11 2024 at 11:30.",
-      details: "Name: John Doe\nEmail: john@example.com\nPhone: 123456789\n\nA free skin care consultation, please",
-      date: "2024-01-01",
-      time: "11:30",
-      name: "John Doe",
-      email: "john@example.com",
-      phone: "123456789",
-      more_details: "A free skin care consultation, please",
+    SUMMARY: {
+      screen: "SUMMARY",
+      data: {
+        appointment: "Mon Jan 11 2024 at 11:30.",
+        details: "Name: John Doe\nEmail: john@example.com\nPhone: 123456789\n\nA free skin care consultation, please",
+        date: "2024-01-01",
+        time: "11:30",
+        name: "John Doe",
+        email: "john@example.com",
+        phone: "123456789",
+        more_details: "A free skin care consultation, please",
+      },
     },
-  },
-  TERMS: {
-    screen: "TERMS",
-    data: {},
-  },
-  SUCCESS: {
-    screen: "SUCCESS",
-    data: {
-      extension_message_response: {
-        params: {
-          flow_token: "REPLACE_FLOW_TOKEN",
-          some_param_name: "PASS_CUSTOM_VALUE",
+    TERMS: {
+      screen: "TERMS",
+      data: {},
+    },
+    SUCCESS: {
+      screen: "SUCCESS",
+      data: {
+        extension_message_response: {
+          params: {
+            flow_token: "REPLACE_FLOW_TOKEN",
+            some_param_name: "PASS_CUSTOM_VALUE",
+          },
         },
       },
     },
-  },
-};
+  };
+}
 
 export const getNextScreen = async (decryptedBody, companyId) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
+  
+  // console.log('action', action); 
+  
   // handle health check request
   if (action === "ping") {
     return {
@@ -115,6 +124,9 @@ export const getNextScreen = async (decryptedBody, companyId) => {
 
   // handle initial request when opening the flow and display APPOINTMENT screen
   if (action === "INIT") {
+    
+    fillData(); 
+    
     return {
       ...SCREEN_RESPONSES.APPOINTMENT,
       data: {
@@ -142,24 +154,34 @@ export const getNextScreen = async (decryptedBody, companyId) => {
             is_time_enabled: Boolean(data.date),
 
             // filter each field options based on current selection
-            date: SCREEN_RESPONSES.APPOINTMENT.data.date,
+            date: await Promise.all(SCREEN_RESPONSES.APPOINTMENT.data.date),
             time: await Promise.all(SCREEN_RESPONSES.APPOINTMENT.data.time.map(async (timeSlot, index) => {
               let enabled = true;
               if (data.date) {
-                
-                // console.log('index', index);
-                // console.log('timeSlot.id', timeSlot.id);
-                
+
                 const dateTime = `${data.date}T${timeSlot.id}:00-05:00`;
+
+                // Use moment-timezone to correctly parse and handle the timezone
+                const dateTimeMoment = moment.tz(dateTime, 'America/Bogota'); // Specify the correct timezone
                 const availableMentor = await findAvailableMentor(companyId, dateTime);
                 const [hours, minutes] = timeSlot.id.split(':').map(Number);
-                
-                //console.log('dateTime', dateTime);
-                // console.log('availableMentor', availableMentor);
-                //console.log('Date', new Date(dateTime));
-                //console.log('getHours', new Date(dateTime).getHours());
-                
-                if (availableMentor === null || new Date(dateTime) < new Date() || (new Date(dateTime).getDay() === 6 && hours >= 12)) {
+
+                // Get the correct day of the week using moment-timezone
+                const dayOfWeek = dateTimeMoment.day(); // This will be correct in the specified timezone
+
+                // Calculate one hour earlier using moment
+                const oneHourLater = dateTimeMoment.clone().subtract(2, 'hours');
+
+                if (dateTime === '2024-11-08T17:00:00-05:00') {
+                  console.log("availableMentor", availableMentor);
+                  console.log("dateTime", dateTime);
+                  console.log("oneHourLater < new Date()", oneHourLater.isBefore(moment()));
+                  console.log("dayOfWeek", dayOfWeek);
+                  console.log("hours", hours);
+                  console.log("(dayOfWeek === 6 && hours >= 12)", (dayOfWeek === 6 && hours >= 12));
+                }
+
+                if (availableMentor === null || oneHourLater.isBefore(moment()) || (dayOfWeek === 6 && hours >= 12)) {
                   enabled = false; // Disable time slot if no available mentor
                 }
               }
@@ -171,7 +193,6 @@ export const getNextScreen = async (decryptedBody, companyId) => {
             appointment: "Mon Jan 02 2024 at 11:30.",
           },
         };
-
       // handles when user completes DETAILS screen
       case "DETAILS":
         const dateName = SCREEN_RESPONSES.APPOINTMENT.data.date.find(
