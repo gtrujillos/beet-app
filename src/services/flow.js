@@ -214,7 +214,19 @@ export const getNextScreen = async (decryptedBody, companyId) => {
       // handles when user completes SUMMARY screen
       case "SUMMARY":
         try {
-          const availableMentor = await findAvailableMentor(companyId, data.date);
+
+          // const dateTimeMoment = moment.tz(data.date, 'America/Bogota'); // Specify the correct timezone
+          
+          const startDateTime = `${data.date}T${data.time}:00-05:00`;
+
+          // console.log("screen", screen);
+          // console.log("data.date", data.date);
+          // console.log("startDateTime", startDateTime);
+
+          const availableMentor = await findAvailableMentor(companyId, startDateTime);
+
+          // console.log("availableMentor", availableMentor);
+
           if (!availableMentor) {
             console.error("No available mentor found for the selected date.");
             throw new Error("No available mentor");
@@ -228,7 +240,7 @@ export const getNextScreen = async (decryptedBody, companyId) => {
           
           // console.log("appointmentsByPhone", JSON.stringify(appointmentsByPhone));
 
-          const startDateTime = `${data.date}T${data.time}:00-05:00`;
+          // const startDateTime = `${data.date}T${data.time}:00-05:00`;
           const eventDetails = {
             summary: `Capacitación ${appointmentsByPhone[0].title}`,
             description: `Capacitación ${appointmentsByPhone[0].title} con mentor ${availableMentor.Nombre}`,
