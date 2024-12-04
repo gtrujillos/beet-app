@@ -51,6 +51,9 @@ export class GoogleAuthRepository {
   }
 
   async updateTokensByCompanyId(companyId, tokens) {
+
+    console.log("updateTokensByCompanyId tokens", tokens);
+
     try {
       const client = await getDbConnection();
       const query = {

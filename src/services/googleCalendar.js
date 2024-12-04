@@ -1,31 +1,49 @@
-// services/googleCalendar.js
-
 import { google } from "googleapis";
+import { createOAuth2Client, renewTokenWithRefreshToken } from "../services/googleOAuth.js";
 import { MentorAgendaRepository } from "../repositories/mentorAgendaRepository.js";
-import { createOAuth2Client, handleTokenRefresh, renewTokenWithRefreshToken } from "../services/googleOAuth.js";
 import crypto from "crypto";
 
 async function retryWithRenewToken(callback, companyId, ...args) {
+  console.log("retryWithRenewToken");
+
   try {
-    return await callback(...args);
+    return await callback(...args); // Initial attempt
   } catch (err) {
+    console.log("retryWithRenewToken error:", err.message);
+
+    // Check for 401 Unauthorized errors
     if (err.response && err.response.status === 401) {
-      console.error("Access token expired, attempting to renew");
-      const auth = await renewTokenWithRefreshToken(companyId);
-      args[0] = auth; // Replace auth in arguments
-      return await callback(...args);
+      console.error("Access token expired or invalid. Attempting to renew...");
+
+      try {
+        // Refresh the token
+        const refreshedAuth = await renewTokenWithRefreshToken(companyId);
+
+        console.log("Token refreshed. Retrying the request...");
+
+        // Retry the callback with the refreshed `OAuth2Client`
+        return await callback(refreshedAuth, ...args.slice(1));
+      } catch (refreshErr) {
+        console.error("Error refreshing token during retry:", refreshErr.message);
+        throw new Error("Failed to refresh token. Re-authentication required.");
+      }
     } else {
+      console.error("Unhandled error in retryWithRenewToken:", err.message);
       throw err;
     }
   }
 }
 
 export async function listEvents(companyId) {
+  console.log("listEvents");
+
   let auth = await createOAuth2Client(companyId);
-  const calendar = google.calendar({ version: "v3", auth });
-  const listEventsCallback = async (auth) => {
+
+  return retryWithRenewToken(async (auth) => {
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 8);
+
+    const calendar = google.calendar({ version: "v3", auth });
     const res = await calendar.events.list({
       calendarId: "primary",
       timeMin: new Date().toISOString(),
@@ -34,18 +52,19 @@ export async function listEvents(companyId) {
       singleEvents: true,
       orderBy: "startTime",
     });
-    return res.data.items;
-  };
 
-  return retryWithRenewToken(listEventsCallback, companyId, auth);
+    return res.data.items;
+  }, companyId, auth);
 }
 
 export async function addEvent(companyId, eventDetails, appointmentsId, mentorId) {
   let auth = await createOAuth2Client(companyId);
-  const calendar = google.calendar({ version: "v3", auth });
-  const addEventCallback = async (auth) => {
+
+  return retryWithRenewToken(async (auth) => {
+    const calendar = google.calendar({ version: "v3", auth });
     const requestId = crypto.randomUUID();
-    const event = await calendar.events.insert({
+
+    var eventData = {
       calendarId: "primary",
       conferenceDataVersion: 1,
       resource: {
@@ -81,25 +100,37 @@ export async function addEvent(companyId, eventDetails, appointmentsId, mentorId
         visibility: "public",
         anyoneCanAddSelf: true,
       },
-    });
+    };
 
-    const meetLink = event.data.conferenceData?.entryPoints?.find(entry => entry.entryPointType === "video")?.uri;
+    console.log("eventData");
+
+    const event = await calendar.events.insert(eventData);
+
+    const meetLink = event.data.conferenceData?.entryPoints?.find(
+      (entry) => entry.entryPointType === "video"
+    )?.uri;
+
     const mentorAgendaRepository = new MentorAgendaRepository();
     const startDateTimeUtc = new Date(eventDetails.startDateTime).toISOString();
-    await mentorAgendaRepository.updateAppointment(appointmentsId, 'Agendado', mentorId, meetLink, startDateTimeUtc);
+    await mentorAgendaRepository.updateAppointment(
+      appointmentsId,
+      "Agendado",
+      mentorId,
+      meetLink,
+      startDateTimeUtc
+    );
 
     return event.data;
-  };
-
-  return retryWithRenewToken(addEventCallback, companyId, auth);
+  }, companyId, auth);
 }
 
 export async function findAvailableMentor(companyId, dateTime, durationMinutes = 60) {
   let auth = await createOAuth2Client(companyId);
-  const calendar = google.calendar({ version: "v3", auth });
-  const mentorAgendaRepository = new MentorAgendaRepository();
 
-  const findAvailableMentorCallback = async (auth) => {
+  return retryWithRenewToken(async (auth) => {
+    const calendar = google.calendar({ version: "v3", auth });
+    const mentorAgendaRepository = new MentorAgendaRepository();
+
     const events = await listEvents(companyId);
     const eventStartDateTime = new Date(dateTime);
     const eventEndDateTime = new Date(eventStartDateTime.getTime() + durationMinutes * 60000);
@@ -120,12 +151,18 @@ export async function findAvailableMentor(companyId, dateTime, durationMinutes =
     });
 
     const mentors = await mentorAgendaRepository.getAllMentors();
-    
+
     // Find the first mentor without an appointment overlapping the given date and time
     for (const mentor of mentors) {
-      if (mentor.Correo_electronico) {        
+      if (mentor.Correo_electronico) {
         const hasAppointment = eventsOnDateTime.some((event) => {
-          return event.attendees && event.attendees.some(attendee => attendee.email.toLowerCase() === mentor.Correo_electronico.toLowerCase());
+          return (
+            event.attendees &&
+            event.attendees.some(
+              (attendee) =>
+                attendee.email.toLowerCase() === mentor.Correo_electronico.toLowerCase()
+            )
+          );
         });
 
         if (!hasAppointment) {
@@ -133,8 +170,7 @@ export async function findAvailableMentor(companyId, dateTime, durationMinutes =
         }
       }
     }
-    return null;
-  };
 
-  return retryWithRenewToken(findAvailableMentorCallback, companyId, auth);
+    return null;
+  }, companyId, auth);
 }
